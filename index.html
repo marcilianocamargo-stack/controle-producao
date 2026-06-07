@@ -656,7 +656,7 @@ async function exportarExcel(modo) {
         p.numPalete, p.chapas, p.data, p.hora,
         p.gramatura||'', p.coluna||'', p.resultado||'OK',
         p.observacoes||'',
-        p.fotos&&p.fotos.length?p.fotos.length+' foto(s) — ver aba Fotos':''
+        p.fotos&&p.fotos.length?p.fotos.length+' foto(s)':''
       ]);
     });
     const totalProd=g.reduce((s,r)=>s+Number(r.chapas),0);
@@ -675,18 +675,17 @@ async function exportarExcel(modo) {
   ];
   XLSX.utils.book_append_sheet(wb,wsDetalhe,'Produção');
 
-  // ABA FOTOS
-  const fotoRows=[['OF','PALETE','HORA','NOME ARQUIVO','IMAGEM (base64 — cole no navegador para visualizar)']];
+  // ABA FOTOS — só nomes, sem base64 (evita limite de 32767 chars por célula)
+  const fotoRows=[['OF','PALETE','HORA','QTD FOTOS','NOMES DOS ARQUIVOS']];
   regs.forEach(r=>{
     if(r.fotos&&r.fotos.length){
-      r.fotos.forEach(f=>{
-        fotoRows.push([r.of, r.numPalete, r.hora, f.name, f.b64]);
-      });
+      const nomes = r.fotos.map(f=>f.name).join(', ');
+      fotoRows.push([r.of, r.numPalete, r.hora, r.fotos.length, nomes]);
     }
   });
   if(fotoRows.length>1){
     const wsFotos=XLSX.utils.aoa_to_sheet(fotoRows);
-    wsFotos['!cols']=[{wch:10},{wch:8},{wch:6},{wch:20},{wch:60}];
+    wsFotos['!cols']=[{wch:10},{wch:8},{wch:6},{wch:10},{wch:60}];
     XLSX.utils.book_append_sheet(wb,wsFotos,'Fotos');
   }
 
