@@ -67,10 +67,9 @@ input.big{font-size:22px;font-weight:700;text-align:center;color:var(--ok)}
 .btn-sec{background:transparent;color:var(--accent2);border:2px solid var(--accent)}
 
 /* BOTÃO EXPORTAR — dois botões lado a lado */
-.export-row{display:none;gap:8px;margin-bottom:10px}
-.export-row.visible{display:flex}
-.btn-export{flex:1;background:linear-gradient(135deg,#1dd1a1,#00b894);color:#0a2218;font-size:14px;padding:14px 8px;border-radius:10px;border:none;font-weight:900;cursor:pointer;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:6px}
-.btn-export.share{background:linear-gradient(135deg,#2e86de,#54a0ff);color:white}
+.export-row{display:none;margin-bottom:10px}
+.export-row.visible{display:block}
+.btn-export{width:100%;background:linear-gradient(135deg,#1dd1a1,#00b894);color:#0a2218;font-size:15px;padding:15px;border-radius:10px;border:none;font-weight:900;cursor:pointer;letter-spacing:.3px}
 .btn-export:disabled{opacity:.5;cursor:default}
 
 .btn-clear{background:transparent;color:var(--danger);border:1px solid var(--danger);padding:9px;border-radius:7px;width:100%;font-size:12px;cursor:pointer;margin-bottom:8px}
@@ -232,8 +231,7 @@ input.big{font-size:22px;font-weight:700;text-align:center;color:var(--ok)}
 
     <!-- Botões exportar na aba Registro -->
     <div class="export-row" id="exportRowReg">
-      <button class="btn-export" onclick="exportarExcel('baixar')">⬇ Baixar Excel</button>
-      <button class="btn-export share" onclick="exportarExcel('share')">↑ Compartilhar</button>
+      <button class="btn-export" onclick="exportarExcel()">⬇ Exportar / Compartilhar Excel</button>
     </div>
 
   </div>
@@ -245,8 +243,7 @@ input.big{font-size:22px;font-weight:700;text-align:center;color:var(--ok)}
 
     <!-- Botões exportar na aba Histórico -->
     <div class="export-row" id="exportRowHist">
-      <button class="btn-export" onclick="exportarExcel('baixar')">⬇ Baixar Excel</button>
-      <button class="btn-export share" onclick="exportarExcel('share')">↑ Compartilhar</button>
+      <button class="btn-export" onclick="exportarExcel()">⬇ Exportar / Compartilhar Excel</button>
     </div>
 
     <button class="btn-clear" id="btnClear" onclick="limparDia()" style="display:none">
@@ -630,8 +627,8 @@ function limparDia(){
   atualizarBadge();
 }
 
-// ── EXPORTAR EXCEL — com share ou download ─────────────────────
-async function exportarExcel(modo) {
+// ── EXPORTAR EXCEL ─────────────────────────────────────────────
+async function exportarExcel() {
   const regs=getRegistros();
   if(!regs.length){alert('Nenhum registro para exportar.');return;}
 
@@ -706,43 +703,37 @@ async function exportarExcel(modo) {
 
   const nome='Producao_'+hoje().replace(/\//g,'-')+'.xlsx';
 
-  // ── SHARE — blob URL em nova aba (Chrome Android não permite share de .xlsx direto)
-  if (modo === 'share') {
-    const wbArray = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    const blob = new Blob([wbArray], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-    const file = new File([blob], nome, {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
+  // Gera o blob do xlsx
+  const wbArray = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbArray], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
 
-    // Tenta Web Share API com arquivo
-    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-      try {
-        await navigator.share({files:[file], title: nome});
-        mostrarMsg('✓ Compartilhado: ' + nome, true);
-        return;
-      } catch(err) {
-        if (err.name === 'AbortError') return; // cancelado pelo usuário
-        // Permission denied ou outro erro: cai no fallback
-      }
+  // Tenta Web Share API (funciona em alguns browsers/contextos)
+  const file = new File([blob], nome, {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+    try {
+      await navigator.share({files:[file], title: nome});
+      mostrarMsg('✓ Compartilhado: ' + nome, true);
+      return;
+    } catch(err) {
+      if (err.name === 'AbortError') return; // cancelado
+      // falhou: cai para download
     }
-
-    // Fallback: abre blob em nova aba
-    // No Android, o Chrome baixa automaticamente ou oferece "Abrir com"
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nome;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    mostrarMsg('✓ ' + nome + ' — verifique Downloads ou Compartilhar pelo navegador', true);
-    return;
   }
 
-  // ── DOWNLOAD DIRETO ────────────────────────────────────────
-  XLSX.writeFile(wb, nome);
-  mostrarMsg('✓ Excel baixado: ' + nome, true);
+  // Download via link — funciona em todos os browsers Android/iOS
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  mostrarMsg('✓ ' + nome + ' baixado — abra em Downloads para compartilhar', true);
 }
 
 // ── UTILS ──────────────────────────────────────────────────────
