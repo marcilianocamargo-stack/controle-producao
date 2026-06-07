@@ -706,32 +706,37 @@ async function exportarExcel(modo) {
 
   const nome='Producao_'+hoje().replace(/\//g,'-')+'.xlsx';
 
-  // ── SHARE ──────────────────────────────────────────────────
+  // ── SHARE — blob URL em nova aba (Chrome Android não permite share de .xlsx direto)
   if (modo === 'share') {
-    try {
-      // gera o array de bytes do xlsx
-      const wbArray = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-      const blob = new Blob([wbArray], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-      const file = new File([blob], nome, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
+    const wbArray = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const blob = new Blob([wbArray], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const file = new File([blob], nome, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
 
-      if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+    // Tenta Web Share API com arquivo
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      try {
         await navigator.share({files:[file], title: nome});
-        mostrarMsg('✓ Arquivo compartilhado: ' + nome, true);
-      } else {
-        // fallback: download normal
-        XLSX.writeFile(wb, nome);
-        mostrarMsg('✓ Baixado (compartilhamento não disponível neste navegador): ' + nome, true);
-      }
-    } catch(err) {
-      if (err.name !== 'AbortError') {
-        // usuário cancelou o share — silencioso
-        mostrarMsg('Erro ao compartilhar: ' + err.message, false);
+        mostrarMsg('✓ Compartilhado: ' + nome, true);
+        return;
+      } catch(err) {
+        if (err.name === 'AbortError') return; // cancelado pelo usuário
+        // Permission denied ou outro erro: cai no fallback
       }
     }
+
+    // Fallback: abre blob em nova aba
+    // No Android, o Chrome baixa automaticamente ou oferece "Abrir com"
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nome;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    mostrarMsg('✓ ' + nome + ' — verifique Downloads ou Compartilhar pelo navegador', true);
     return;
   }
 
